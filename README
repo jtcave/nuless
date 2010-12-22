@@ -1,0 +1,141 @@
+nuless - scriptable pager with hypertext
+========================================
+
+    Original (C) 1999 by M. Andreoli <andreoli@pisoft.it>
+    Updates (C) 2010 by James Cave <jcave137@gmail.com>
+
+
+Introduction
+============
+
+`nuless` is a pager (console text viewer) that happens to be highly scriptable,
+with support for advanced features like hypertext and keyboard events. It
+can be used as a mere pager (with a feature set somewhere between `less` and
+`more`), but its real strength lies in its ability to interact with a control
+program and display basic ncurses interfaces from shell scripts (or any
+program.)
+
+nuless is based on the `muless` pager / shell script UI toolkit that ships with
+the floppy Linux distro muLinux. I've adopted and cleaned the code a bit, as
+muLinux is no longer being developed, and I've tried to improve the documentation
+(the original author's English is, in his words, "fractured.")
+
+
+Installation
+============
+
+You need ncurses, along with a Linux system of some kind. Other *nix
+variants haven't been tested yet, but it should be portable to them.
+
+You also need development tools: gcc and make should be enough.
+
+On Ubuntu, you'll want to install the packages build-essential and
+libncurses-dev.
+
+	$ make
+	$ ./nuless README
+	$ sudo make install
+
+
+Usage
+=====
+
+	nuless [options] [file]
+	OR
+	command | nuless [options]
+
+options:
+
+	-h             display this cruft
+	-M             monochrome mode
+	-l             less mode
+	-m             mutt mode
+	-x             lynx mode
+	-r seconds     refresh mode (do not send keyboard events)
+	-e prog        control program [does not work in less mode]
+	-t top         top bar title
+	-b bottom      bottom bar menu
+	-s status      initial status message
+	-n name        instance name
+
+Modes
+=====
+
+Switches -l (less) , -m (mutt) and -x (lynx) will change the look and feel of
+nuless to emulate various popular console programs.
+
+The default mode is mutt mode. If nuless is invoked as less (symlink, hard
+link, or copy), the default mode will be less mode.
+
+The less mode does not have support for the scripting API.
+
+Scripting API
+=============
+
+The control program specified via `-e PROGRAM' is invoked as:
+
+			PROGRAM "event" pid name
+
+The format of the event string depends on which mode nuless is in.
+
+        less:           event="key nome-file"
+        mutt:           event="key row-number row-contents"
+        lynx:           event="key row-number link"
+
+* `pid' is the PID of nuless. If the program sends SIGUSR1 to
+this pid, nuless will reload the file.
+* `name' is the name of the calling process.
+
+If the control program sends SIGUSR1 to nuless, nuless will reload
+its input file. This is used to update the screen, and should be
+done after every invocation of the control program
+
+Additional rows in input file, like: 
+
+	:T: top title 
+	:B: bottom menu 
+	:S: status message 
+
+can simulate -t, -b options and control the "status message" (last row).
+
+The control program should react to a keyboard event by writing a new
+output file and sending SIGUSR1 (kill -10) to nuless.
+
+Hypertext links
+---------------
+
+Enclose the link text between these tags (^A is the Control-A character):
+
+		^Athis is a link^B
+
+You can insert these codes (ascii \0 and \1) using vi:
+
+		control-v control-a
+		control-v control-b
+
+
+
+Refresh mode
+-------------
+Refresh mode will reload the file every few seconds.
+
+		nuless -r seconds  file
+
+Example one-line uptime monitor:
+
+		nuless -r 2 -t "Uptime monitor" /proc/uptime
+
+The -r switch can be used in conjunction with -e switch, to run the control
+program repeatedly.
+
+
+Demos
+=====
+These demos can be found in the demo subdirectory of the nuless tree.
+
+	* br.demo       demonstrate hyperlinks
+	* funny.demo    turn each vowel into a hyperlink
+	* in.demo       input fields
+	* man.demo      man browser with hyperlinks
+	* mon.demo      automatically updating monitor sample
+	* pion          file browser
