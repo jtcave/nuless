@@ -1,0 +1,29 @@
+#!/bin/sh
+
+#set -x
+
+
+refresh()
+{
+
+cat > /tmp/cnt <<END 
+:T: Monitor demo -- `date` 
+:B: `date` 
+
+END
+
+
+
+}
+
+pid=$2
+set -- $1
+
+
+if [ -z "$1" ] ; then
+refresh
+exec muless -r 2 -e $0 /tmp/cnt
+fi
+
+refresh
+

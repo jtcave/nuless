@@ -1,0 +1,5 @@
+#!/bin/sh
+
+man.sh
+muless -e man.sh -x /tmp/cnt 
+

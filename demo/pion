@@ -1,0 +1,222 @@
+#!/bin/sh
+# Rustic File Manager 
+# by M. Andreoli 1999
+
+#set -x
+
+#-----------------
+# local variables
+#-----------------
+
+menu1="[1]:  [123] menus | [c]d | [m]kdir | [d]elete | [e]dit |[q]uit | [h]elp\
+"
+menu2="[2]:  [p]rint | [f]ile type| [R]eprogram ... in progress ..."
+Name="PION: muLinux File Manager"
+
+
+#--------------------
+# LOCAL FUNCTIONS 
+#--------------------
+
+Help()
+{
+
+cat <<END
+
+       _             
+ _ __ (_) ___  _ __  
+| '_ \| |/ _ \| '_ \ 
+| |_) | | (_) | | | |
+| .__/|_|\___/|_| |_| 	A Rustic File Manager, for muLinux
+|_|                  
+
+
+-ENTER-         select items 
+
+1,2, ...        select new submenus
+
+Supported items:
+
+                directory, ASCII, html, gz, bz2, tgz, 
+		tbz ...
+
+END
+
+}
+
+
+Select()
+{
+
+case $1 in
+*.html|*.htm)
+	lynx -force_html $1
+	;;
+*.tgz|*.tar.gz)
+
+	cat $1 | gzip -dc| tar -tf- 2>&1 | \
+	muless -t "Archive contents: $1" -b "stop :))  [q]quit"
+	;;
+*.gz)
+	gzip -dvt $1 2>&1 | \
+        muless -t "Archive contents: $1" -b "stop :))  [q]quit"
+        ;;
+*.bz2)
+	bzip2 -dvt $ 2>&1 | \
+        muless -t "Archive contents: $1" -b "stop :))  [q]quit"
+        ;;
+*.tbz)
+	bzip2 -ds $1| tar -tf 2>&1 | \
+        muless -t "Archive contents: $1" -b "stop :))  [q]quit"
+        ;;
+*)
+	muless -e $0 -b "[q]uit" -t "File: $1" $1
+	;;
+esac
+
+}
+
+#---------------------------
+# Save the local environment
+#---------------------------
+
+Save()
+{
+cat > /tmp/mem <<END
+dir="$dir"
+menu="$menu"
+END
+
+}
+
+#-----------------------
+# reload: $1=dir $2=mesg
+#-----------------------
+
+Reload()
+{
+
+case "$dir" in
+/cdrom/|/a/) mount $dir 2>/dev/null
+	;;
+esac
+
+cat > /tmp/cnt <<END
+:T: $Name -- [$dir] 
+:B: $menu 
+:S: $@
+END
+
+/bin/ls -alp $dir |\
+grep -v "^total [0-9]" | grep -v ' \.\/' >> /tmp/cnt
+kill -10 $pid
+
+}
+
+#--------------
+# Main
+#--------------
+
+
+# initialization
+
+if [ -z "$1" ] ; then
+menu=$menu1;
+#dir="`pwd`/"
+dir="/"
+Save
+Reload "Current dir: $dir"
+muless -e $0 /tmp/cnt
+fi
+
+
+#  from muless 
+
+pid=$2
+set -- $1
+
+key=$1; row=$2
+shift 10 2>/dev/null; F=$1 
+
+. /tmp/mem
+
+# main switch
+
+
+case $key in
+h)
+	Help| muless -t "Pion help" -b "[q]uit"
+	;;
+q)
+	exit
+	;;
+) #select
+	case "$F" in
+	"../") new="`dirname $dir`/";;
+	*) new="$dir$F";;
+	esac
+	
+	if [ -d "$new" ]; then
+		dir=$new
+		Save
+		Reload "Current dir: $new"
+	else
+		Select "$dir$F"
+	fi
+	;;
+m) #mkdir
+	read -p "enter dirname: " nd
+	mkdir "$dir$nd" && Reload "a new dir $nd, in $dir"
+	;;
+d) #delete
+
+	ed=n
+	if [ -d "$F" ] ; then
+		read -p "erase $F and ALL contents (y/n) [n]? " ed
+		[ "$ed" = y ] && rm -r "$dir$F" \
+		&& msg="removed dir: $F"
+	else
+		rm $dir$F
+		msg="removed file: $F"
+	fi
+	Reload $msg 
+	;;
+f) #file type
+	sel=$F
+	set `file $dir$F` ; shift
+	ft="$sel: $@"
+	read -p "$ft -press ENTER-" dummy
+	;;
+c) #change dir
+	read -p "new dir: " dir 
+
+	case $dir in
+	*/) ;;
+	*) dir="$dir/";;
+	esac
+
+	Save
+	Reload "Current dir: $dir"
+	;;
+1) # menu 1
+	menu=$menu1
+	Save
+	Reload
+	;;
+2) # menu 2
+	menu=$menu2
+	Save
+	Reload
+	;;
+p) #print
+	lpr $dir$F
+	sleep 2
+	;;
+e) # edit
+	vi $dir$F
+	;;
+R) 
+	vi $0 
+	;;
+esac
+

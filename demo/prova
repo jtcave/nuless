@@ -1,0 +1,12 @@
+#!/bin/sh
+
+#set -x
+
+
+
+cat > /tmp/cnt <<END 
+:T: Monitor demo -- `date` 
+:B: `date` 
+
+END
+
