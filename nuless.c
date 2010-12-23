@@ -1,8 +1,20 @@
 /*
-  muLess v0.1 alpha
-  programmable 
-  (C) by Michele Andreoli, 1999 (GPL)
+  nuless -- programmable pager
+  Original file copyright 1999 Michele Andreoli
+  Subsequent changes copyright 2010 James Cave
 
+  nuless is free software: you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
+  
+  nuless is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with nuless.  If not, see <http://www.gnu.org/licenses/>.
 
 */ 
 
@@ -20,34 +32,58 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
-/* app's */
+/**** Globals ****/
 
 
-/* Is muless running in monochrome mode? */
+/* Is nuless running in monochrome mode? */
 int mono=FALSE;
 
-/* TODO: document */
+/* Flag for refresh mode, as well as the interval */
 int refr=FALSE, refr_time=1;
+
+/* Input file name */
 char *ifile=NULL;
 
 /* name of this program */
 char *prgname;
 
-/* TODO: document */
-#define MAXLINES  10000 
+/* input file handle */
 FILE *in_fd;
+
+/* file descriptor for /dev/tty */
 int tty;
+
+/* general purpose character buffer */
 char buffer[512];
+
+/* stupid hard-coded limit! */
+#define MAXLINES  10000 
+
+/* each line of the file */
 char *lines[MAXLINES];
+
+/* messages */
 char TopMsg[128]="";
 char BarMsg[128]="";
 char StatusMsg[128]="";
+
+/* name of the control program */
 char Control[32]="";
+
+/* instance name */
 char Name[16]="";
+
+/* child and self PIDs */
 int child,pid;
+
+/* buffer for string-formatted PID, used in event strings */
 char pid_arg[16];
 
-int nlines,npages, slines,offset=0;
+/* number of lines and pages in the file */
+int nlines,npages;
+
+/* */
+int slines,offset=0;
 
 /* table of strings */
 
@@ -63,9 +99,11 @@ struct Link
 
 char current[128]; 	/* current link */
 
-/* mode */
+/* mode codes */
 
 enum { LESS_MODE, LYNX_MODE, MUTT_MODE, REFR_MODE};
+
+/* mutt is the default mode */
 int mode=MUTT_MODE;
 
 /* map modes to human-readable strings */
@@ -78,8 +116,8 @@ struct Tab mlist[]=
     {-1,NULL},
   };
 
-/* TODO: document */
-/* other */
+
+/* actions to do in print_row */
 
 enum { DO_PRINT, DO_COUNT};
 
@@ -131,11 +169,11 @@ void loop_event();
 #define WHITE_ON_RED 3 
 #define GREEN_ON_BLACK 4 
 
-/* TODO: document */
+/* formatting attributes for different purposes */
 chtype LINK, SELECT, BAR, MSG, STATUS;
 
 
-/* link's escape code */
+/* escape code for links */
 
 #define SLINK 0x1 
 #define ELINK 0x2 
@@ -384,7 +422,7 @@ static void Abort(char *m) {
   exit(1);
 }
 
-/* quit on control-C */
+/* ask user to quit on q or ^C */
 
 static void quit(int sig) {
   int c;
@@ -413,7 +451,6 @@ static void quit(int sig) {
 }
 
 /* load input file */
-/* TODO: document */
 #define SKIP_NL fscanf(in_fd,"%*c")
 static void load()
 {
@@ -422,29 +459,29 @@ static void load()
   else
     in_fd=stdin;
 
-  if (in_fd==NULL)
-    {
+  if (in_fd==NULL) {
       Abort("missing input file");
     }
 
-  /* read info */
+  /* read the info headers */
   char id;
-  while ( fscanf(in_fd,":%c:",&id) > 0   )
+  while ( fscanf(in_fd,":%c:",&id) > 0   ) {
     switch(id)
       {
       case 'T':
-	{fscanf(in_fd,"%[^\n]",TopMsg);
-	  SKIP_NL;
-	  break;}
+	fscanf(in_fd,"%[^\n]",TopMsg);
+	SKIP_NL;
+	break;
       case 'B':
-	{fscanf(in_fd,"%[^\n]",BarMsg);
-	  SKIP_NL;
-	  break;}
+	fscanf(in_fd,"%[^\n]",BarMsg);
+	SKIP_NL;
+	break;
       case 'S':
-	{fscanf(in_fd,"%[^\n]",StatusMsg);
-	  SKIP_NL;
-	  break;}
+	fscanf(in_fd,"%[^\n]",StatusMsg);
+	SKIP_NL;
+	break;
       }
+  }
 
   /* read rows */
 
@@ -474,8 +511,10 @@ static void load()
   if ( in_fd==stdin )
     {
       tty=open("/dev/tty",O_RDONLY);
-      if (tty<0)
-	{ fprintf(stderr,"%s: cannot open tty.",prgname), exit(1);}
+      if (tty<0) {
+	fprintf(stderr,"%s: cannot open tty.", prgname);
+	exit(1);
+      }
       dup(tty);
     }
 
@@ -493,8 +532,7 @@ static void load()
 }
 
 /* SIGUSR1 (-10) handler */
-/* Reload */
-/* TODO: document */
+/* Reload the file */
 static void reload(int sig) {
   int rc;
 
@@ -502,19 +540,24 @@ static void reload(int sig) {
   load();
 
 
-  /* some defaults */
+  /* apply default settings */
 
   offset=0;
   switch (mode)
     {
     case REFR_MODE:
     case MUTT_MODE:
-      if(TopMsg[0]=='\0') sprintf(TopMsg,"%s", ifile==NULL?"(stdin)":ifile);
-      if(BarMsg[0]=='\0') strcpy(BarMsg,"q for quit");
+      if(TopMsg[0]=='\0') {
+	sprintf(TopMsg,"%s", ifile==NULL?"(stdin)":ifile);
+      }
+      if(BarMsg[0]=='\0') {
+	strcpy(BarMsg,"q for quit");
+      }
       c_link.row=1;
       c_link.cur=0;
       c_link.count=0;
       break;
+
     case LYNX_MODE:
       /*
         c_link.row=0;
@@ -541,136 +584,151 @@ static void reload(int sig) {
 
   redraw();
 
-  if (sig!=0)
-    {
-      waitpid(child, &rc,0);
-      signal(SIGUSR1,reload);
-    }
-
+  if (sig!=0) {
+    waitpid(child, &rc,0);
+    signal(SIGUSR1,reload);
+  }
 }
 
-/* Redraw */
-/* TODO: document */
-static void redraw() {
-  int i;
+/** more display routines **/
 
+/* Redraw the screen */
+static void redraw() {
+  /* print the messages if they exist*/
   if (TopMsg[0]!='\0') top(TopMsg);
   if (BarMsg[0]!='\0') bar(BarMsg);
   if (StatusMsg[0]!='\0') msg(StatusMsg);
 
   attrset(A_NORMAL);
 
-  for (i=1; (i<=slines) && (i+offset<=nlines); i++)
-    {
-      move(i,0);
-      scan_line(i+offset,DO_PRINT);
-    }
-  for (; i<=slines; i++)
-    {
-      move(i,0);
-      printw("%s",""); clrtoeol();
-    }
+  int i;
+  for (i=1; (i<=slines) && (i+offset<=nlines); i++) {
+    /* redraw this line of text */
+    move(i,0);
+    scan_line(i+offset,DO_PRINT);
+  }
+  for (; i<=slines; i++) {
+    /* erase blank lines */
+    move(i,0);
+    printw("%s","");
+    clrtoeol();
+  }
 
   refresh();
 }
 
-/** linked list routines **/
-
-/* scanline: print and search link */
-/* TODO: document */
+/* scanline: print a line and format links */
 int scan_line(int i, int opt) {
-  int printed=1;
-  int count=0;
-  int active=0;
-  int link_begin=0,link_end=0;
-  chtype ch,link_attr,line_attr;
-  char c;
-  int v=0,j;
-
-  v=0;
+  int v=0;
   current[0]='\0';
 
-  link_attr=LINK;
-  line_attr=A_NORMAL;
-
+  /* set attributes */
+  chtype link_attr=LINK;
+  chtype line_attr=A_NORMAL;
   switch(mode)
-    {
+  {
     case REFR_MODE:
     case MUTT_MODE:
-      if ( i== c_link.row ) {line_attr=SELECT; break;}
+      if ( i == c_link.row ) {
+	line_attr=SELECT;
+	break;
+      }
     case LYNX_MODE:
-      if ( i== c_link.row ) {link_attr=SELECT; break;}
+      if ( i == c_link.row ) {
+	link_attr=SELECT;
+	break;
+      }
     case LESS_MODE:
-      { break;}
+      break;
     default:
-      { LOG("scan_line: unk mode"); exit(1);}
-    }
-
+      LOG("scan_line: undefined mode");
+      exit(1);
+  }
   clrtoeol();
 
 
-  /* put single char and fill row with blanks */
+  /* start printing the line */
+  int printed = 1;
+  int count = 0;
+  int j;
+  for (j=0; printed<=COLS; j++) {
+    int count=0;
+    char c=*(lines[i]+j);
+    int link_begin=0,link_end=0;
+    int active=0;
 
-  for (j=0; printed<=COLS; j++)
-    {
-      c=*(lines[i]+j);
+    /* quit printing if there aren't any characters left */
+    if (c==0) break;
+    if (c==SLINK) {
+      /* This is the start of a link. Don't print it. Do note it. */
+      link_begin=TRUE;
+      v = 0;
+      count++;
+      continue;
+    } 
 
+    if (c==ELINK) {
+      /* This is the end of a link. Don't print it. Do note it. */
+      link_end = link_begin ? TRUE : FALSE;
+      continue;
+    }
 
-      if (c==0) break;
-      if (c==SLINK) 
-	{link_begin=TRUE ; v=0; count++; continue;} 
-
-      if (c==ELINK) 
-	{link_end=link_begin?TRUE:FALSE;continue;}
-
-      ch=c|line_attr;
+    /* apply attributes */
+    chtype ch = c|line_attr;
 			
-      active=(c_link.cur==count) \
-	&& (c_link.cur!=0) \
-	&& (link_attr==SELECT) \
-	;
+    /* is this character part of the active link? */
+    active=(c_link.cur==count) \
+      && (c_link.cur!=0) \
+      && (link_attr==SELECT) \
+      ;
 
-      if (link_begin) {
-	  ch=c|LINK;
-	  if (active) {
-	      ch=c|SELECT;
-	      current[v]=c; current[v+1]='\0';
-	      v++;
-	    }
-	  if (line_attr==SELECT) {
-	    ch=c|SELECT;
-	  }
-	}
+    /* If there's a link going on, render it as a link. */
+    if (link_begin) {
+      ch=c|LINK;
+      if (active) {
+	/* active links look different than inactive links */
+	ch=c|SELECT;
+	current[v]=c; current[v+1]='\0';
+	v++;
+      }
+      if (line_attr==SELECT) {
+	ch=c|SELECT;
+      }
+    }
 
-      if (link_end) {
-	  if(active) {
-	    current[v-1]='\0';
-	    v=0;
-	  }
-
-	  ch=c|line_attr; 
-	  link_begin=FALSE; link_end=FALSE;
-	}
-
-
-      /* if (c == '\n') continue */;
-      if ( (opt==DO_PRINT)  && c!='\n') {
-	if ( (ch & A_CHARTEXT) < 128 ) {
-	  addch(ch);
-	}
-	else {
-	  addch( (ch & A_CHARTEXT) | line_attr);
-	}
+    if (link_end) {
+      if(active) {
+	current[v-1]='\0';
+	v=0;
       }
 
+      ch=c|line_attr; 
+      /* reset! */
+      link_begin=FALSE; link_end=FALSE;
+    }
 
-      /* printed count */	
-      printed++;
-      if (c=='\t') printed+=7;
-    } /* for */
 
+    if ( (opt==DO_PRINT)  && c!='\n') {
+      /* if we're printing, then print the rendered character */
+      if ( (ch & A_CHARTEXT) < 128 ) {
+	addch(ch);
+      }
+      else {
+	addch( (ch & A_CHARTEXT) | line_attr);
+      }
+    }
+
+
+    /* printed count */	
+    printed++;
+    /* tabs are 8 spaces */
+    if (c=='\t') printed+=7;
+  } /* for */
+
+  /* fill rest of line with blanks */
   for (; printed<=COLS; printed++)
-    if (opt==DO_PRINT) addch(' '|line_attr);
+    if (opt==DO_PRINT)
+      addch(' '|line_attr);
 
   /* attrset(A_NORMAL); */
   return count;
@@ -841,7 +899,7 @@ void print_bottom() {
 }
 
 /* Send a key binding to the control program, if one is present */
-void do_callback (char c) {
+void do_callback(char c) {
   /*int i=0;*/
   int rc;
   char *name=NULL;
@@ -849,6 +907,7 @@ void do_callback (char c) {
   /* If there's no control program, then give a message and return */
   if (Control[0] == '\0') {
     msg("key unbound -- q for quit");
+    return;
   }
 
   msg("");
