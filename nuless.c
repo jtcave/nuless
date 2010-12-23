@@ -840,65 +840,61 @@ void print_bottom() {
   refresh(); 
 }
 
-/* docallback */
-/* TODO: document */
-void do_callback ( char c) {
+/* Send a key binding to the control program, if one is present */
+void do_callback (char c) {
   /*int i=0;*/
   int rc;
   char *name=NULL;
 
+  /* If there's no control program, then give a message and return */
+  if (Control[0] == '\0') {
+    msg("key unbound -- q for quit");
+  }
+
   msg("");
   refresh();
 
+  /* Construct the event string */
   switch(mode)
     {
     case LESS_MODE:
-      {
-	sprintf(buffer,"%c %d %s",c,0,ifile==NULL?"(stdin)":ifile);
-	break;
-      }
+      sprintf(buffer,"%c %d %s",c,0,ifile==NULL?"(stdin)":ifile);
+      break;
+      
     case REFR_MODE:
     case MUTT_MODE:
-      {
-	sprintf(buffer,"%c %d %s",c,c_link.row,lines[c_link.row]);
-	break;
-      }
+      sprintf(buffer,"%c %d %s",c,c_link.row,lines[c_link.row]);
+      break;
+      
     case LYNX_MODE:
-      {
-	scan_line(c_link.row,DO_COUNT);
-	sprintf(buffer,"%c %d %s",c,c_link.row,current);
-      }
-    }
+      scan_line(c_link.row,DO_COUNT);
+      sprintf(buffer,"%c %d %s",c,c_link.row,current);
+      break;
+  }
 
-  /* instance name */
+  /* set instance name */
 
   if ( Name[0]!='\0') name=Name;
 
+  /* fork and exec the control program */
+  child = fork();
 
-  if (Control[0]!='\0')
-    {
-      child=fork();
-
-      if ( child ) {
-	waitpid(child,&rc,0);
-	endwin();
-	init_ncurses();
-	redraw();
-	;}
-      else
-	{
-	  ;
-	  endwin();
-	  execl (Control,Control,buffer,pid_arg,name,NULL);
-	}
-    }
-
-  else { msg("key unbound -- q for quit");}
-
-
+  if ( child ) {
+    /* I'm the parent. wait for the child and restart the display */
+    waitpid(child,&rc,0);
+    endwin();
+    init_ncurses();
+    redraw();
+  }
+  else {
+    /* I'm the child. exec my control program. */
+    endwin();
+    execl (Control,Control,buffer,pid_arg,name,NULL);
+  }
 }
 
-/* TODO: document */
+
+/* Initialize the screen */
 void init_ncurses() {
   /* ncurses init */
 
@@ -908,39 +904,37 @@ void init_ncurses() {
   noecho();       /* don't echo input */
   meta(stdscr,TRUE);
 
+  /* allow cbreak in event mode only */
   if (refr) nocbreak();
   else cbreak();
 
   /* apps init */
 
-  if (has_colors() && (!mono) )
-    {
-      start_color();
+  if (has_colors() && (!mono) )  {
+    /* init color styles */
+    start_color();
 
-      init_pair(WHITE_ON_BLUE,COLOR_WHITE,COLOR_BLUE);
-      init_pair(WHITE_ON_RED,COLOR_WHITE,COLOR_RED);
-      init_pair(RED_ON_BLACK,COLOR_RED,COLOR_BLACK);
-      init_pair(GREEN_ON_BLACK,COLOR_GREEN,COLOR_BLACK);
+    init_pair(WHITE_ON_BLUE,COLOR_WHITE,COLOR_BLUE);
+    init_pair(WHITE_ON_RED,COLOR_WHITE,COLOR_RED);
+    init_pair(RED_ON_BLACK,COLOR_RED,COLOR_BLACK);
+    init_pair(GREEN_ON_BLACK,COLOR_GREEN,COLOR_BLACK);
 
-      LINK=COLOR_PAIR(GREEN_ON_BLACK);
-      SELECT=COLOR_PAIR(WHITE_ON_RED);
-      BAR=COLOR_PAIR(WHITE_ON_BLUE)|A_BOLD;
-      MSG=COLOR_PAIR(RED_ON_BLACK)| A_BOLD;
-      STATUS=COLOR_PAIR(GREEN_ON_BLACK);
-    }
-  else
-    {
-      LINK=A_UNDERLINE;
-      SELECT=A_REVERSE;
-      BAR=A_REVERSE;
-      MSG=A_BOLD;
-      STATUS=A_BOLD;
-    }
-
-
+    LINK=COLOR_PAIR(GREEN_ON_BLACK);
+    SELECT=COLOR_PAIR(WHITE_ON_RED);
+    BAR=COLOR_PAIR(WHITE_ON_BLUE)|A_BOLD;
+    MSG=COLOR_PAIR(RED_ON_BLACK)| A_BOLD;
+    STATUS=COLOR_PAIR(GREEN_ON_BLACK);
+  }
+  else {
+    LINK=A_UNDERLINE;
+    SELECT=A_REVERSE;
+    BAR=A_REVERSE;
+    MSG=A_BOLD;
+    STATUS=A_BOLD;
+  }
 }
 
-/* TODO: document */
+/* Main loop for the refresh mode. */
 void loop_refresh() {
   int c;
   strcpy(StatusMsg," ");
@@ -959,50 +953,47 @@ void loop_refresh() {
   }
 }
 
-/* TODO: document */
+/* Main loop for event-driven modes (lynx, less, and mutt modes) */
 void loop_event() {
   int c;
-  for(;;)
-    {
-      c=getch();
+  for(;;) {
+    c=getch();
 
-      switch(c) {
-      case 'q':
-	{
-	  do_callback(c);
-	  finish(0);
-	  break;
-	} 
-      case KEY_NPAGE:
-	{
-	  n_link.row+=slines; if(!do_scroll(c)) n_link.row-=slines;
-	  redraw();
-	  break;
-	}
-      case KEY_PPAGE:
-	{
-		
-	  n_link.row-=slines; if (!do_scroll(c)) n_link.row+=slines;
-		
-	  redraw();
-	  break;
-	}
-      case KEY_DOWN:
-	{
-	  if (next_link(+1))  do_scroll(c) ; redraw(); 
-	  break;
-	}
-      case KEY_UP:
-	{
-	  if (next_link(-1)) do_scroll(c); redraw(); 
-	  break;
-	}
-      default:
-	{
-	  do_callback(c);
-	}
-      }
+    switch(c) {
+    case 'q':
+      do_callback(c);
+      finish(0);
+      break;
+
+    case KEY_NPAGE:
+      n_link.row += slines;
+      if(!do_scroll(c))
+	n_link.row -= slines;
+      redraw();
+      break;
+
+    case KEY_PPAGE:
+      n_link.row -= slines;
+      if (!do_scroll(c))
+	n_link.row += slines;
+      redraw();
+      break;
+
+    case KEY_DOWN:
+      if (next_link(+1))
+	do_scroll(c);
+      redraw(); 
+      break;
+
+    case KEY_UP:
+      if (next_link(-1))
+	do_scroll(c);
+      redraw(); 
+      break;
+
+    default:
+      do_callback(c);
     }
-
+  }
   finish(0);
 }
