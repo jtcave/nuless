@@ -1,5 +1,5 @@
 #version:=$(shell echo `cat version.h | awk '{print $$3}'`)
-OPT=-O2  -fno-strength-reduce
+OPT=-Wall -O2  -fno-strength-reduce
 
 
 all: nuless
@@ -10,7 +10,7 @@ all: nuless
 
 nuless:	nuless.c
 	gcc $(OPT) nuless.c -lncurses -o nuless
-	# strip nuless
+# 	strip nuless
 	du -h nuless
 
 install:
