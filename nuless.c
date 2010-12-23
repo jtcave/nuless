@@ -190,7 +190,7 @@ chtype LINK, SELECT, BAR, MSG, STATUS;
 /* top and bottom rows */
 
 void print_row(char *s, int r) {
-  char row[128];
+  char row[1024];
   /*
     char FMT[32];
     sprintf(FMT,"%%%dc%%s%%%dc",XCENTER(s),XCENTER(s));
