@@ -21,8 +21,8 @@ set -- $1
 
 
 if [ -z "$1" ] ; then
-refresh
-exec muless -r 2 -e $0 /tmp/cnt
+    refresh
+    exec nuless -r 2 -e $0 /tmp/cnt
 fi
 
 refresh

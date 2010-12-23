@@ -16,23 +16,25 @@ fmt="%${lab}s  %s"
 # collect data
 
 #- system
-set -- `cat /proc/meminfo`
+#set -- `cat /proc/meminfo`
+set -- `free -ok`
 shift 7
 tot=$1; fr=$3
-set -- `cat /proc/meminfo | grep SwapTotal`
-swap="$2 $3"
+#set -- `cat /proc/meminfo | grep SwapTotal`
+shift 7
+swap="$2/$3 kb"
 
-
-echo "- System"
 echo
-printf "$fmt" "MEM TOT:" "$tot bytes"	
 echo
-printf "$fmt" "MEM FREE:" "$fr bytes"	
+echo
+printf "$fmt" "MEM TOT:" "$tot kb"	
+echo
+printf "$fmt" "MEM FREE:" "$fr kb"	
 echo
 printf "$fmt" SWAP: "$swap"	
 echo
-printf "$fmt" CPU: `cat /proc/stat|grep cpu| sed s/cpu//`
-echo
+#printf "$fmt" CPU: `cat /proc/stat|grep cpu| sed -n '1p'`
+#echo
 printf "$fmt" LOADAVG: "`cat /proc/loadavg`"
 echo
 printf "$fmt" UPTIME: "`cat /proc/uptime`"
@@ -42,19 +44,21 @@ set -- `cat /proc/stat| grep processes`
 printf "$fmt" "PROCESSES #:" $2 
 echo
 echo
-echo "- Network"
-echo
+#echo "- Network"
+#echo
 
-set -- `cat /proc/net/dev |  sed -n /dummy:/!P | sed -n /:/P` 
+#set -- `cat /proc/net/dev |  sed -n /dummy:/!P | sed -n /:/P` 
 
-while [ $# -gt 0 ]; do
-printf "%${lab}s  Tx: %4s Rx: %4s" $1 $2 $7
-echo
-shift 12
-done
+#while [ $# -gt 0 ]; do
+#printf "%${lab}s  Tx: %4s Rx: %4s" $1 $2 $7
+#echo
+#shift 12
+#done
+
 
 
 kill -10 $pid 2>/dev/null
+
 }
 
 pid=$2
@@ -63,6 +67,6 @@ set -- $1
 refresh > /tmp/cnt
 
 if [ -z "$1" ] ; then
-exec muless -r 2 -e $0 /tmp/cnt
+    exec nuless -r 2 -e $0 /tmp/cnt
 fi
 

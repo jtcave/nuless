@@ -2,6 +2,6 @@
 
 #set -x
 
-in.sh
-muless -e in.sh -x /tmp/cnt 
+./in.sh
+nuless -e ./in.sh -x /tmp/cnt 
 

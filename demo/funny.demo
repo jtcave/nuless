@@ -2,4 +2,4 @@
 
 
 cat ../README | sed 's/\([aeiou]\)/\1/g' > out
-muless -x out
+nuless -x out

@@ -1,5 +1,5 @@
 #!/bin/sh
 
-man.sh
-muless -e man.sh -x /tmp/cnt 
+./man.sh
+nuless -e ./man.sh -x /tmp/cnt 
 

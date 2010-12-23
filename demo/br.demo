@@ -17,9 +17,9 @@
 Select()
 {
 case $1 in
-*all*) ls | muless;;
+*all*) ls -l .. | nuless;;
 *)
-	muless -e $0 -t $1 -b "[q]quit" $1
+	nuless -e $0 -t $1 -b "[q]quit" $1
 	;;
 esac
 }
@@ -39,7 +39,10 @@ END
 
 cat $link >> /tmp/cnt
 
-kill -10 $pid
+if [ -n "$1" ]
+then
+    kill -USR1 $pid
+fi
 
 }
 
@@ -52,11 +55,11 @@ kill -10 $pid
 
 if [ -z "$1" ] ; then
 Reload br.txt 
-muless -e $0  -t "hypertext demo" -b "-enter- select the link" -x br.txt
+nuless -e $0  -t "hypertext demo" -b "-enter- select the link" -x br.txt
 exit
 fi
 
-# passed from muless 
+# passed from nuless 
 
 
 pid=$2

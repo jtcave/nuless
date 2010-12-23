@@ -21,8 +21,10 @@ END
 cat /tmp/mem | sed 's/=\(.*\)$/	\1/g' >> /tmp/cnt
 
 
-
-kill -10 $pid 
+if [ -n "$pid" ]
+then
+    kill -10 $pid 
+fi
 exit
 }
 

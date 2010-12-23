@@ -8,10 +8,16 @@
 # local variables
 #-----------------
 
-menu1="[1]:  [123] menus | [c]d | [m]kdir | [d]elete | [e]dit |[q]uit | [h]elp\
+menu1="[1]:  [12] menus | [c]d | [m]kdir | [d]elete | [e]dit |[q]uit | [h]elp\
 "
 menu2="[2]:  [p]rint | [f]ile type| [R]eprogram ... in progress ..."
 Name="PION: muLinux File Manager"
+
+# if EDITOR isn't set...use vi
+if [ -z "$EDITOR" ]; then
+    EDITOR=vi
+fi
+
 
 
 #--------------------
@@ -47,7 +53,7 @@ END
 
 Select()
 {
-
+# file associations here
 case $1 in
 *.html|*.htm)
 	lynx -force_html $1
@@ -55,22 +61,22 @@ case $1 in
 *.tgz|*.tar.gz)
 
 	cat $1 | gzip -dc| tar -tf- 2>&1 | \
-	muless -t "Archive contents: $1" -b "stop :))  [q]quit"
+	nuless -t "Archive contents: $1" -b "stop :))  [q]quit"
 	;;
 *.gz)
 	gzip -dvt $1 2>&1 | \
-        muless -t "Archive contents: $1" -b "stop :))  [q]quit"
+        nuless -t "Archive contents: $1" -b "stop :))  [q]quit"
         ;;
 *.bz2)
 	bzip2 -dvt $ 2>&1 | \
-        muless -t "Archive contents: $1" -b "stop :))  [q]quit"
+        nuless -t "Archive contents: $1" -b "stop :))  [q]quit"
         ;;
-*.tbz)
+*.tbz|*.tar.bz2)
 	bzip2 -ds $1| tar -tf 2>&1 | \
-        muless -t "Archive contents: $1" -b "stop :))  [q]quit"
+        nuless -t "Archive contents: $1" -b "stop :))  [q]quit"
         ;;
 *)
-	muless -e $0 -b "[q]uit" -t "File: $1" $1
+	nuless -e $0 -b "[q]uit" -t "File: $1" $1
 	;;
 esac
 
@@ -109,7 +115,9 @@ END
 
 /bin/ls -alp $dir |\
 grep -v "^total [0-9]" | grep -v ' \.\/' >> /tmp/cnt
-kill -10 $pid
+if [ -n "$pid" ]; then
+    kill -10 $pid
+fi
 
 }
 
@@ -122,15 +130,15 @@ kill -10 $pid
 
 if [ -z "$1" ] ; then
 menu=$menu1;
-#dir="`pwd`/"
-dir="/"
+dir="`pwd`/"
+#dir="/"
 Save
 Reload "Current dir: $dir"
-muless -e $0 /tmp/cnt
+nuless -e $0 /tmp/cnt
 fi
 
 
-#  from muless 
+#  from nuless 
 
 pid=$2
 set -- $1
@@ -142,12 +150,12 @@ shift 10 2>/dev/null; F=$1
 
 # main switch
 
-
+clear    # always redraw screen on key hits
 case $key in
-h)
-	Help| muless -t "Pion help" -b "[q]uit"
+h)  #help
+	Help| nuless -t "Pion help" -b "[q]uit"
 	;;
-q)
+q)  #quit
 	exit
 	;;
 ) #select
@@ -213,10 +221,10 @@ p) #print
 	sleep 2
 	;;
 e) # edit
-	vi $dir$F
+	$EDITOR $dir$F
 	;;
 R) 
-	vi $0 
+	$EDITOR $0 
 	;;
 esac
 
