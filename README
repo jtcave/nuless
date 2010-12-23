@@ -136,6 +136,7 @@ These demos can be found in the demo subdirectory of the nuless tree.
 	* br.demo       demonstrate hyperlinks
 	* funny.demo    turn each vowel into a hyperlink
 	* in.demo       input fields
-	* man.demo      man browser with hyperlinks
-	* mon.demo      automatically updating monitor sample
+	* man.demo      man browser
+	* mon.demo      system monitor
+	* Mon		more powerful system monitor
 	* pion          file browser
