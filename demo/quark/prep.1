@@ -1,0 +1,134 @@
+#!/bin/sh
+# prep.1 , html->txt: sed, tr ...
+
+# ^N  newline
+# ^P tags ignored
+# ^E , (m4 problem)
+
+
+
+HR="\
+  --------------------------------------------------------------------------"
+
+
+prolog()
+{
+tr '\012' '' | \
+tr -d '\015' | \
+tr '`' \' |\
+tr ',' ''
+}
+
+script()
+{
+sed "s/<SCRIPT.*SCRIPT>//g; \
+s/<script.*script>//g; \
+s/<\![^>]*>//g; \
+s/{[^}]*}//g; \
+" 
+}
+
+
+
+special()
+{
+sed "\
+s/\&copy;/(C)/g; \
+s/\&ograve;/o\'/g; \
+s/\&oacute;/o\'/g; \
+s/\&ugrave;/u\'/g; \
+s/\&agrave;/a\'/g; \
+s/\&aacute;/a\'/g; \
+s/\&egrave;/e\'/g; \
+s/\&eacute;/e\'/g; \
+s/\&igrave;/i\'/g; \
+s/\&quot;/\"/g; \
+s/\&lt;/\</g; \
+s/\&gt;/\>/g; \
+s/\&nbsp;/\ /g; \
+s/\&#146;/\'/g; \
+s/\&#147;/\"/g; \
+s/\&#148;/\"/g; \
+"
+}
+
+image()
+{
+#sed "s/<img\|IMG [ ]*src\|SRC=\([^>]*\)>/_IMG_(\1)/g"
+sed "s/<[iI][mM][gG] \
+[ ]*[sS][rR][cC]=\([^>]*\) \
+[ ]*[aA][lL][tT]=\"\([^>]*\)\">\
+/_IMG_(\1,\2)/g"
+}
+
+H1()
+{
+sed "s/<[hH]1[^>]*>\([^<]*\)<\/[Hh]1>/_H1_(\1)/g"
+}
+
+H2()
+{
+sed "s/<[hH]2>\([^<]*\)<\/[Hh]2>/_H2_(\1)/g"
+}
+
+TITLE()
+{
+sed "s/<title>\([^<]*\)<\/title>/_TITLE_(\1)/g" |\
+sed "s/<TITLE>\([^<]*\)<\/TITLE>/_TITLE_(\1)/g"
+}
+
+style()
+{
+sed "s/<[pP]>//g" | \
+sed "s/<em>\([^>]*\)<\/em>/\'\1\'/g" | \
+sed "s/<EM>\([^>]*\)<\/EM>/\'\1\'/g" | \
+sed "s/<tt>\([^>]*\)<\/tt>/\'\1\'/g" | \
+sed "s/<TT>\([^>]*\)<\/TT>/\'\1\'/g" | \
+sed "s/<[bB]>\([^>]*\)<\/[bB]>/\'\1\'/g" | \
+sed "s/<i>\([^>]*\)<\/i>/\'\1\'/g" | \
+sed "s/<I>\([^>]*\)<\/I>/\'\1\'/g" | \
+sed "s/<li>/\  + /g" | \
+sed "s/<LI>/\  + /g" | \
+sed "s/<DT>/\  + /g" | \
+sed "s/<dt>/\  + /g" | \
+sed "s/<[dD][dD]>/ /g" | \
+sed "s/*<[hH][rR]>*/${HR}/g" | \
+sed "s/<style.*style>//g" | \
+sed "s/<STYLE.*STYLE>//g" | \
+cat
+}
+
+pack()
+{
+sed "s/*//g" |\
+sed "s///g" 
+}
+
+epilog()
+{
+tr '' '\012' | tr -d '' 
+}
+
+ignore()
+{
+sed "s/<[^>]*>//g" |
+sed "s/<[^>]*>//g" 
+}
+
+
+link()
+{
+sed "s/<[aA][ ]*[hH][rR][eE][fF]=\([^>]*\)>\([^<]*\)<\/[aA]>/_URL_(\1,\2)/g"
+}
+
+ident()
+{
+sed "s/^[ ]*[^0-9].*$/  &/g"
+}
+
+
+# Main
+
+#prolog|script|style|link|image|TITLE|H1|H2|special|ignore|pack|epilog|ident
+prolog|script|style|link|image|TITLE|H1|H2|special|ignore|epilog|ident
+

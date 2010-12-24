@@ -140,3 +140,4 @@ These demos can be found in the demo subdirectory of the nuless tree.
 	* mon.demo      crude system monitor
 	* Mon		more powerful system monitor
 	* pion          file browser
+	* quark/quark	crude Web browser, currently broken

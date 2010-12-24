@@ -57,7 +57,7 @@ int tty;
 char buffer[512];
 
 /* stupid hard-coded limit! */
-#define MAXLINES  10000 
+#define MAXLINES  50000 
 
 /* each line of the file */
 char *lines[MAXLINES];
@@ -652,6 +652,7 @@ int scan_line(int i, int opt) {
   int count = 0;
   int j;
   for (j=0; printed<=COLS; j++) {
+    if (nlines == 0) break;
     int count=0;
     char c=*(lines[i]+j);
     int link_begin=0,link_end=0;

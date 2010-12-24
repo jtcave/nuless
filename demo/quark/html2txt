@@ -1,0 +1,22 @@
+#!/bin/sh
+
+if [ -r /etc/quark.conf ] ; then
+    . /etc/quark.conf
+else
+    . $INSTALL/quark.conf
+fi
+
+
+cat > /tmp/tmp$$
+
+cat /tmp/tmp$$ |  sed -n '/<\/[^>]\+>/P' > /tmp/is$$
+
+set -- `cat /tmp/is$$`; is=$#
+
+if [ "$is" -ne 0 ] ; then
+	cat /tmp/tmp$$| prep.1| prep.2 | fmt
+else
+	cat /tmp/tmp$$
+fi
+
+rm -f /tmp/tmp$$ /tmp/is$$

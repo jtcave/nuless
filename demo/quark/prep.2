@@ -1,0 +1,7 @@
+#!/bin/sh
+# html->txt: prep.2, m4 phase
+
+
+INSTALL=`dirname $0`
+
+m4 ${INSTALL}/lib.m4  - | sed 's//,/g' 

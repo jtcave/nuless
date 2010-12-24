@@ -1,0 +1,439 @@
+#!/bin/sh
+##############################
+# QUARK - micro browser for MULINUX 
+# by M. Andreoli (1998-99) 
+##############################
+
+#set -x
+
+#-------------------
+# Static variables
+#-------------------
+
+if [ -r /etc/quark.conf ] ; then
+        . /etc/quark.conf
+elif [ -r ./quark.conf ] ; then
+        . ./quark.conf
+else
+    echo "NO CONFIG FILE FOUND"
+    TMP="/tmp"
+fi
+
+NC=nc
+
+menu1="\
+ [r]eload [g]o [b]ack [v]iew [u]rls [s]ave [d]ownload [P]rint [q]uit    [h]elp"
+
+#---------------------
+# Local functions 
+#---------------------
+
+FileSize()
+{
+f=$1
+set -- `/bin/ls -l $f`
+echo "$5 bytes"
+}
+
+Help()
+{
+cat <<END
+
+
+
+		          Quark - The Ridicolous Web Browser
+		               (C) 1998-99 M. Andreoli
+
+	This browser is the smallest web browser in the world, I think!
+	Quark is based on a set of hacks: "netcat" port scanner for 
+	fetch the pages and classical UNIX text-tools like sed, tr, awk, 
+	and m4 for html->txt translation. 
+
+	Quark can undestand HTML 1, HTML 2 and HTML n, with n>2,
+	because any unknown tags are simply stripped out from the page.
+
+Usage
+------
+		# quark
+	    or  # quark URL
+
+page-up and page-down scrools the page  and arrow-up/arrow-down navigate
+between links. 
+
+
+URLs supported
+--------------
+
+		file://, http://, ftp://, mailto:
+
+	http and ftp protocols supports standard features as:
+
+		http://host:port/....
+		ftp://user:pass@host/...
+
+Download
+---------
+	
+	Click "d" key when an URL is selected.
+
+END
+}
+
+#skip standard HTML headers
+
+skip_header()
+{
+while [ 1 ] 
+do
+read line
+[ -z "$line" ] && break 
+done
+
+cat
+
+}
+
+
+# save the local environment
+
+Save()
+{
+cat > $MEM <<END
+URL="$URL"
+pro="$pro"
+Host="$host"
+port="$port"
+host_spec="$host_spec"
+dir="$dir"
+menu="$menu"
+TMP=$TMP
+END
+}
+
+norm()
+{
+case $1 in
+mailto:*|file:*|http:*|ftp:*) URL=$1
+        ;;
+/*/)
+        URL="${pro}//${host_spec}$1"
+        ;;
+/*)
+        URL="${pro}//${host_spec}/$1"
+        ;;
+*)
+        URL="${dir}$1"
+	;;
+esac
+echo $URL
+}
+
+SaveDir()
+{
+URL=$1
+
+case $URL in
+*/)     dir=$URL
+        ;;
+*)
+        dir="`dirname $URL`/"
+        ;;
+esac
+Save
+}
+
+
+strip_color()
+{
+tr -d '' | tr -d ''
+}
+
+Reload()
+{
+bottom=`printf "%-67s" $@`
+cat > $TMP/cnt <<END
+:T: $menu
+:B: ${bottom} Quark v0.2  
+END
+
+cat $TMP/page.txt >> $TMP/cnt
+
+# send the "reload" signal to nuless
+
+[ "$pid" ] && kill -10 $pid 2>/dev/null
+}
+
+
+mailto()
+{
+address=$1
+clear
+
+if [ -r /setup/cnf/sendmail.cnf ]; then
+	. /setup/cnf/sendmail.cnf
+else
+	EMAIL="your@email"
+fi
+
+read -p "To [$address]: " To 
+[ -z "$To" ] && To=${address}
+
+read -p "From [$EMAIL]: " From 
+[ -z "$From" ] && From=$EMAIL
+
+read -p "Subject [$URL]: " Subject
+[ -z "$Subject" ] && Subject=$URL
+
+cat > $TMP/mail <<END
+To: $To
+From: $From
+Subject: $Subject
+
+END
+
+echo
+echo "Start editing."
+echo "Warning: start the email-body with a blank line"
+read -p "press -ENTER-" dummy
+
+vi $TMP/mail
+
+read -p "May I send (y/n) [n]? " send
+[ -z "$send" ] && send=n
+
+case $send in
+y)
+	cat $TMP/mail | sendmail -t
+	;;
+esac 
+
+}
+
+
+GetUrl()
+{
+URL="$1"
+
+> $TMP/$URL_LIST
+
+# parse URL pro://host:port/dir/page
+
+set -- `echo $URL | tr '/' ' '`
+pro=$1; 
+
+case "$pro" in
+ftp:*) # call Pion
+	pion $URL
+	return
+	;;
+http:*)
+
+	host_spec=$2
+	set -- `echo $host_spec| tr ':' ' '`
+	host=$1; port=$2
+	page=`echo $URL| sed s/^.*${host_spec}//`
+	;;
+file:*)
+	host_spec=; host=; port=
+	page=`echo $URL| sed "s/file:\/\///"`
+	;;
+mailto:*)
+	save=$IFS
+	IFS=":"
+	set -- $URL
+	address=$2
+	IFS=$save
+	URL=`PopUrl`
+	mailto ${address}
+	return
+	;;
+esac
+
+# get URL
+if [ -z "$page" ]; then page="/"; fi
+cat >$TMP/http_request <<EOR
+GET $page HTTP/1.0
+User-Agent: Quark/0.3 (textmode, like Lynx)
+
+EOR
+(
+case "$pro" in
+http:*)
+# -- remote URL
+	echo -n "Getting $URL (host:$host, page:$page) ..." 1>&2
+	#(echo "GET $page" 
+	#echo "Accept: text/html, text/plain, scaz/scaz"
+	#echo "Accept-Language: en"
+	#echo "User-Agent: Quark/0.2 (textmode, like Lynx)"
+	#echo ""
+	#)| \
+	#${NC} ${verbose} ${wait:+"-w $wait"} $host ${port:-80} 
+	${NC} ${verbose} ${wait:+"-w $wait"} $host ${port:-80} < $TMP/http_request
+	;;
+ftp:*)
+	ftp $URL
+	echo "unsupported."; sleep 2
+	;;
+file:*)
+
+# -- local URL
+	f=${page}
+
+	if [ -r "$f" ] ; then
+		cat $f 
+	else
+		echo "file $f non-existent."
+	fi
+	;;
+esac
+echo -n "`FileSize $TMP/page.html` ..." 1>&2
+#) | skip_header > $TMP/page.html 
+) > $TMP/page.html
+
+}
+
+Translate()
+{
+# translation html->txt
+
+# note: this "cd" is required, because m4 must create url.list
+# in the $TMP dir
+
+(
+cd $TMP
+cat page.html| $INSTALL/html2txt > page.txt
+)
+echo -n "Ok." 1>&2
+}
+
+
+# PushUrl ($1)
+
+PushUrl()
+{
+URL=$1
+cp $TMP/history $TMP/history.old
+(echo $URL; cat $TMP/history.old) > $TMP/history
+}
+
+# urk=`PopUrl`
+
+PopUrl()
+{
+set -- `cat $TMP/history`
+URL=`norm $2`
+shift
+echo "$@" > $TMP/history
+echo $URL
+}
+
+
+#--------------
+# Main
+#--------------
+
+# initialization
+case $# in
+0|1) # called by the user
+	menu="$menu1";
+	export TMP=/tmp/quark$$; (cd /tmp; mkdir quark$$)
+
+	export MEM=/tmp/mem$$
+
+	>$TMP/history
+	>$TMP/page.txt
+	host=;port=;host_spec=
+
+	dir="`pwd`/"
+	key=start; pid=
+	if [ "$1" ] ; then
+		URL="$1"
+	else
+		URL=${START_URL}
+	fi
+	Save
+
+	;;
+
+*) # called by nuless via "exec"
+	pid=$2; name=$3
+	set -- $1
+	key=$1; row=$2; link="$3" 
+	;;
+esac
+
+# main switch
+
+. $MEM 
+
+case $key in
+start)
+	GetUrl $URL ; Translate; Reload $URL
+	SaveDir $URL
+	PushUrl $URL
+        nuless -e $0 -x $TMP/cnt
+        rm -f $MEM 
+        rm -r $TMP
+        exit	# program end here 
+	;;	
+r) #reload
+	GetUrl "$URL"; Translate; Reload $URL
+	SaveDir $URL
+	;;
+g) # go
+	read -p "URL: " url 
+	URL="`norm $url`"
+	GetUrl "$URL" ; Translate; Reload $URL  
+	SaveDir $URL
+	PushUrl $URL
+	;;
+) # select the link
+	set -- `echo $link| tr -d '[' | tr -d ']'`; n=$1
+	set -- `sed -n "/\[$n\]/P" $TMP/$URL_LIST` ; url=$3
+	URL=`norm $url`
+	GetUrl $URL ; Translate; Reload $URL
+	SaveDir $URL
+	PushUrl $URL
+	;;
+d) # download the URL 
+	set -- `echo $link| tr -d '[' | tr -d ']'`; n=$1
+	set -- `sed -n "/\[$n\]/P" $TMP/$URL_LIST` ; url=$3
+	URL=`norm $url`
+	read -p "Download [`basename $URL`] in the file: " f
+	GetUrl $URL ; echo -n "Ok."; cp $TMP/page.html $f 
+	;;
+
+|b) # back
+	URL=`PopUrl`
+	if [ "$URL" = "" ] ; then
+		echo "No previous URL."; sleep 2
+	else	
+        	GetUrl "$URL" ; Translate; Reload $URL
+        	SaveDir $URL
+	fi
+	;;
+v) # view
+	cat $TMP/page.html | nuless \
+	-t "Quark viewer -- $URL" -b "[q]uit viewer"	
+	;;
+u)  # url list
+	cat $TMP/url.list | nuless \
+	-t "URLs contained in this page --" -b "[q]uit"	
+	;;
+P) # print
+	cat $TMP/page.txt | strip_color | lpr
+	echo -n "printed."
+	sleep 2
+	;;	
+s) # save
+	read -p "Enter file name: " f
+	cat $TMP/page.html > $f
+	echo -n "Saved."; sleep 1
+	;;
+h) # help 
+	Help | nuless -t "Quark, the ridicolous web browser." \
+	-b "[q]uit" \
+	-s "Contains rustic software"
+
+	;;
+esac
