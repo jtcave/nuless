@@ -34,6 +34,7 @@
 
 /**** Globals ****/
 
+/* TODO: split this entire section into a header */
 
 /* Is nuless running in monochrome mode? */
 int mono=FALSE;
@@ -82,18 +83,29 @@ char pid_arg[16];
 /* number of lines and pages in the file */
 int nlines,npages;
 
-/* */
-int slines,offset=0;
-
-/* table of strings */
-
-struct Tab { int e; char *v; };
+/* screen lines */
+int slines;
 
 /* TODO: document */
+int offset=0;
+
+/* Mapping of integer -> string
+   cf. char *elem(struct tab*, int)
+*/
+struct Tab
+{
+  int k;
+  char *v;
+};
+
+/* stores data for hyperlinks */
 struct Link
 {
-  int count;  /* count in row */	
-  int cur;  /* current in row */
+  /* The number of links in the same row as this one. */
+  int count;
+  /* Which of those links is this one? XXX: may not be accurate */
+  int cur;
+  /* Which row contains this link? */
   int row;  /* abs pos. */
 } c_link, n_link;
 
@@ -122,32 +134,42 @@ struct Tab mlist[]=
 enum { DO_PRINT, DO_COUNT};
 
 
-/* function prototypes */
+/** function prototypes **/
  
+/* Termination */
 static void Abort(char*);
 static void finish(int);
 static void quit(int);
-static void load();
-static void reload();
-static void redraw();
-int scan_line(int,int);
-char *elem(); 
 
-int next_link();
-int previous_link();
-int do_scroll();
+/* file loading */
+static void load(void);
+static void reload(int);
+
+/* hyperlink manipulation */
+int next_link(int);
+
+/* display routines */
 void msg(char*);
 void status(char*);
-void print_bottom();
-void do_callback(char);
-void init_ncurses();
+void print_bottom(void);
 void print_row(char*, int);
+void do_callback(char);
 
-void loop_refresh();
-void loop_event();
+/* rendering (high level display routines */
+static void redraw(void);
+int do_scroll(int);
+int scan_line(int,int);
+char *elem(struct Tab *, int); 
+
+/* high-level control */
+void init_ncurses(void);
+void loop_refresh(void);
+void loop_event(void);
+void usage(void);
+void arguments(int, char**);
 
 /* macros */
-
+/* TODO: document these. */
 #define LOG(x) fprintf(stderr,"%s\n",x) 
 #define XCENTER(x) (COLS -strlen(x))/2
 #define MSG_ROW LINES-1 
@@ -234,7 +256,7 @@ void status(char *m)
 
 /* usage message */
 
-int usage() {
+void usage() {
   printf("%s v0.%d\n",prgname, VERSION);
   printf("Usage:   %s [options] [file]\n", prgname);
   printf("options:\n");
@@ -565,6 +587,7 @@ static void reload(int sig) {
       c_link.row=1;
       c_link.cur=0;
       c_link.count=0;
+      break;
     }
 
   /* default actions */
@@ -575,10 +598,10 @@ static void reload(int sig) {
 	case MUTT_MODE:
       */
     case LYNX_MODE:
-      if (next_link(+1) ) 
-	{
-	  if (n_link.row < slines) do_scroll();
-	}
+      if (next_link(+1) ) {
+	/* XXX: do_scroll() was called with no arguments before */
+	if (n_link.row < slines) do_scroll(0);
+      }
       break;
     }
 
@@ -736,80 +759,95 @@ int scan_line(int i, int opt) {
 }
 
 
-/* NextLink */
-/* TODO: document */
+
+/* In lynx mode. searches for the next hyperlink. The argument determines how
+   far to jump; negative arguments search backwards.
+
+   In less or mutt mode, just make sure that there exists a line in that
+   direction.
+
+   Returns TRUE or FALSE depending on whether the link/line was found.
+*/
+
 int next_link(int dir) {
-  int i,count=0;
-  int in_row=0;
-  int t;
-
+  /* If in less or mutt mode, make sure there's a line there. */
+  /* TODO: should this include refresh mode, or would that even make sense? */
   int row;
-
   switch(mode)
     {
     case LESS_MODE:
     case MUTT_MODE:
-      {
-	row=c_link.row+dir;
-	if ( (row > nlines) || (row<1) )
-	  {
-	    printf("\a");
-	    sprintf(StatusMsg,"%s","no more");
-	    return (FALSE);
-	  }
-	n_link.row=row;
-	return(TRUE);
-      }
-    }
-
-  /* search in row */
-
-  t=c_link.cur + dir;
-
-  if ( (t>=1) && (t<=c_link.count)  )
-    {
-      in_row=TRUE ;
-    }
-
-  if ( in_row )
-    {
-      n_link.row=c_link.row;
-      n_link.cur=c_link.cur+dir;
-      n_link.count=c_link.count;
-      return (TRUE);
-    }
-
-  /* forward/backward search */
-
-  for (i=c_link.row + dir ; (i<=nlines) && (i>=1); i+=dir)
-    {
-      count=scan_line(i,DO_COUNT);
-      if (count>0)
-	{n_link.count=count;n_link.row=i;
-	  if (dir>0) n_link.cur=1; else n_link.cur=count;
-	  return(TRUE);
+	row = c_link.row + dir;
+	if ( (row > nlines) || (row<1) ) {
+	  printf("\a");
+	  sprintf(StatusMsg,"%s","no more");
+	  return (FALSE);
 	}
+	n_link.row = row;
+	return (TRUE);
     }
+    
+
+  /* Lynx mode. Search for the hyperlink in the row */
+
+  int in_row = FALSE;
+  int t = c_link.cur + dir;
+
+  if ( (t>=1) && (t<=c_link.count) ) {
+    /* Hit. */
+    /* TODO: optimization? */
+    in_row = TRUE;
+  }
+
+  if (in_row) {
+    /* The next link is the current link. */
+    n_link.row = c_link.row;
+    n_link.cur = c_link.cur + dir;
+    n_link.count = c_link.count;
+    return (TRUE);
+  }
+
+  /* Search in different rows. */
+
+  int count = 0;
+  int i;
+  /* For each row... */
+  for (i = c_link.row + dir; (i<=nlines) && (i>=1); i+=dir) {
+    /* Does this row even have links in it? */
+    count = scan_line(i, DO_COUNT);
+    if (count > 0) {
+      /* Yes, it does; we have a hit. */
+      n_link.count = count;
+      n_link.row = i;
+      if (dir>0)
+	n_link.cur = 1;
+      else
+	n_link.cur = count;
+      return(TRUE);
+    }
+  }
   /*
     n_link.count=0;
     n_link.cur=0;
   */
+
+  /* Link not found. */
   return(FALSE);
 }
 
-/* extract elem in Tab */
-
-char *elem(struct Tab t[], int p) {
+/* Take an array of Tab mappings and a key-value,
+   and find the value associated with the key
+*/
+char *elem(struct Tab table[], int p) {
   int i;
+  for (i=0; table[i].v != NULL; i++)
+    if ( p == table[i].k)
+      return table[i].v;
 
-  for (i=0; t[i].v != NULL; i++)
-    if ( p==t[i].e) return t[i].v;
-
+  /* No such */
   return NULL;
-
 }
 
-/* DoScroll */
 /* TODO: document */
 int do_scroll(int key)
 {

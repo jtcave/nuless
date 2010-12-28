@@ -1,4 +1,4 @@
-CFLAGS=-Wall -g  -fno-strength-reduce
+CFLAGS=-Wall -Wmissing-prototypes -g  -fno-strength-reduce
 
 
 all: nuless
